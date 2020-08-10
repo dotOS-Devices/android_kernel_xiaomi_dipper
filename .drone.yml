@@ -1,0 +1,21 @@
+kind: pipeline
+name: kernel_build
+
+platform:
+  os: linux
+  arch: amd64
+
+clone:
+  depth: 1
+
+steps:
+  - name: setup&build
+    image: ubuntu:latest
+    environment:
+      bot_token:
+        from_secret: bot_token
+      chat_id:
+        from_secret: chat_id
+    commands:
+      - export HOME=/drone
+      - ./build.sh
