@@ -59,7 +59,7 @@
 #include <linux/debugfs.h>
 #include <linux/uaccess.h>
 #endif
-#include <drm/drm_notifier.h>
+#include <linux/msm_drm_notify.h>
 #include <drm/drm_panel.h>
 
 #define INPUT_PHYS_NAME "synaptics_dsx/touch_input"
@@ -2078,21 +2078,23 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 	const struct synaptics_dsx_board_data *bdata =
 			rmi4_data->hw_if->board_data;
 
+	mutex_lock(&(rmi4_data->rmi4_irq_enable_mutex));
+
 	if (attn_only) {
 		retval = synaptics_rmi4_int_enable(rmi4_data, enable);
-		return retval;
+		goto exit;
 	}
 
 	if (enable) {
 		if (rmi4_data->irq_enabled)
-			return retval;
+			goto exit;
 
 		retval = synaptics_rmi4_int_enable(rmi4_data, false);
 		if (retval < 0) {
 			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Failed to disable synaptics int\n",
 					__func__);
-			return retval;
+			goto exit;
 		}
 
 		/* Process and clear interrupts */
@@ -2105,7 +2107,7 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Failed to create irq thread\n",
 					__func__);
-			return retval;
+			goto exit;
 		}
 
 		retval = synaptics_rmi4_int_enable(rmi4_data, true);
@@ -2113,7 +2115,7 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 			dev_err(rmi4_data->pdev->dev.parent,
 					"%s: Failed to enable synaptics int\n",
 					__func__);
-			return retval;
+			goto exit;
 		}
 
 		rmi4_data->irq_enabled = true;
@@ -2124,6 +2126,9 @@ static int synaptics_rmi4_irq_enable(struct synaptics_rmi4_data *rmi4_data,
 			rmi4_data->irq_enabled = false;
 		}
 	}
+
+exit:
+	mutex_unlock(&(rmi4_data->rmi4_irq_enable_mutex));
 
 	return retval;
 }
@@ -5039,7 +5044,7 @@ static int synaptics_rmi4_probe(struct platform_device *pdev)
 		rmi4_data->drm_notifier.notifier_call = synaptics_rmi4_drm_notifier_cb;
 	else
 		rmi4_data->drm_notifier.notifier_call = synaptics_rmi4_drm_notifier_cb_tddi;
-	retval = drm_register_client(&rmi4_data->drm_notifier);
+	retval = msm_drm_register_client(&rmi4_data->drm_notifier);
 	if (retval < 0) {
 		dev_err(&pdev->dev,
 				"%s: Failed to register fb notifier client\n",
@@ -5205,7 +5210,7 @@ err_enable_irq:
 	pm_qos_remove_request(&rmi4_data->pm_qos_req);
 
 #ifdef CONFIG_DRM
-	drm_unregister_client(&rmi4_data->drm_notifier);
+	msm_drm_unregister_client(&rmi4_data->drm_notifier);
 #endif
 
 #ifdef USE_EARLYSUSPEND
@@ -5294,7 +5299,7 @@ static int synaptics_rmi4_remove(struct platform_device *pdev)
 	pm_qos_remove_request(&rmi4_data->pm_qos_req);
 
 #ifdef CONFIG_DRM
-	drm_unregister_client(&rmi4_data->drm_notifier);
+	msm_drm_unregister_client(&rmi4_data->drm_notifier);
 #endif
 
 #ifdef USE_EARLYSUSPEND
@@ -5620,7 +5625,7 @@ static int synaptics_rmi4_drm_notifier_cb(struct notifier_block *self,
 		unsigned long event, void *data)
 {
 	int *transition;
-	struct drm_notify_data *evdata = data;
+	struct msm_drm_notifier *evdata = data;
 	struct synaptics_rmi4_data *rmi4_data =
 			container_of(self, struct synaptics_rmi4_data,
 			drm_notifier);
@@ -5633,13 +5638,14 @@ static int synaptics_rmi4_drm_notifier_cb(struct notifier_block *self,
 		return 0;
 
 	/* Receive notifications from primary panel only */
-	if (evdata && evdata->data && rmi4_data && evdata->is_primary) {
-		if (event == DRM_EVENT_BLANK) {
+	if (evdata && evdata->data && rmi4_data \
+				&& evdata->id == MSM_DRM_PRIMARY_DISPLAY) {
+		if (event == MSM_DRM_EVENT_BLANK) {
 			transition = evdata->data;
-			if (*transition == DRM_BLANK_POWERDOWN) {
+			if (*transition == MSM_DRM_BLANK_POWERDOWN) {
 				synaptics_rmi4_suspend(&rmi4_data->pdev->dev);
 				rmi4_data->fb_ready = false;
-			} else if (*transition == DRM_BLANK_UNBLANK) {
+			} else if (*transition == MSM_DRM_BLANK_UNBLANK) {
 				synaptics_rmi4_resume(&rmi4_data->pdev->dev);
 				rmi4_data->fb_ready = true;
 				if (rmi4_data->wakeup_en) {
@@ -5651,9 +5657,9 @@ static int synaptics_rmi4_drm_notifier_cb(struct notifier_block *self,
 
 				rmi4_data->disable_data_dump = false;
 			}
-		} else if (event == DRM_EARLY_EVENT_BLANK) {
+		} else if (event == MSM_DRM_EARLY_EVENT_BLANK) {
 			transition = evdata->data;
-			if (*transition == DRM_BLANK_POWERDOWN) {
+			if (*transition == MSM_DRM_BLANK_POWERDOWN) {
 				rmi4_data->disable_data_dump = true;
 				if (rmi4_data->dump_flags) {
 					reinit_completion(&rmi4_data->dump_completion);
@@ -5666,7 +5672,7 @@ static int synaptics_rmi4_drm_notifier_cb(struct notifier_block *self,
 					drm_panel_reset_skip_enable(true);
 					drm_dsi_ulps_enable(true);
 				}
-			} else if (*transition == DRM_BLANK_UNBLANK) {
+			} else if (*transition == MSM_DRM_BLANK_UNBLANK) {
 				if (bdata->reset_gpio >= 0 && rmi4_data->suspend) {
 					gpio_set_value(bdata->reset_gpio, bdata->reset_on_state);
 					msleep(bdata->reset_active_ms);
