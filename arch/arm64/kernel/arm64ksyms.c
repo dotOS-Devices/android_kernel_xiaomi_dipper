@@ -19,12 +19,10 @@
 
 #include <linux/export.h>
 #include <linux/sched.h>
-#include <linux/string.h>
 #include <linux/cryptohash.h>
 #include <linux/delay.h>
 #include <linux/in6.h>
 #include <linux/syscalls.h>
-#include <linux/uaccess.h>
 #include <linux/io.h>
 #include <linux/arm-smccc.h>
 #include <linux/kprobes.h>
@@ -32,33 +30,8 @@
 #include <asm/cacheflush.h>
 #include <asm/checksum.h>
 
-EXPORT_SYMBOL(copy_page);
-EXPORT_SYMBOL(clear_page);
-
-	/* user mem (segment) */
-EXPORT_SYMBOL(__arch_copy_from_user);
-EXPORT_SYMBOL(__arch_copy_to_user);
-EXPORT_SYMBOL(__arch_clear_user);
-EXPORT_SYMBOL(__arch_copy_in_user);
-
 	/* physical memory */
 EXPORT_SYMBOL(memstart_addr);
-
-	/* string / mem functions */
-EXPORT_SYMBOL(strchr);
-EXPORT_SYMBOL(strrchr);
-EXPORT_SYMBOL(strcmp);
-EXPORT_SYMBOL(strncmp);
-EXPORT_SYMBOL(strlen);
-EXPORT_SYMBOL(strnlen);
-EXPORT_SYMBOL(memset);
-EXPORT_SYMBOL(memcpy);
-EXPORT_SYMBOL(memmove);
-EXPORT_SYMBOL(__memset);
-EXPORT_SYMBOL(__memcpy);
-EXPORT_SYMBOL(__memmove);
-EXPORT_SYMBOL(memchr);
-EXPORT_SYMBOL(memcmp);
 
 	/* atomic bitops */
 EXPORT_SYMBOL(set_bit);
@@ -81,3 +54,4 @@ EXPORT_SYMBOL(__arm_smccc_hvc);
 EXPORT_SYMBOL(__dma_inv_area);
 EXPORT_SYMBOL(__dma_clean_area);
 EXPORT_SYMBOL(__dma_flush_area);
+

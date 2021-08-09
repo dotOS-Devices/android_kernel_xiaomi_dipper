@@ -23,6 +23,8 @@
 #ifndef __ASM_ASSEMBLER_H
 #define __ASM_ASSEMBLER_H
 
+#include <asm-generic/export.h>
+
 #include <asm/asm-offsets.h>
 #include <asm/cpufeature.h>
 #include <asm/cputype.h>
@@ -431,6 +433,7 @@ alternative_endif
 	.endm
 
 /*
+ * Deprecated! Use SYM_FUNC_{START,START_WEAK,END}_PI instead.
  * Annotate a function as position independent, i.e., safe to be called before
  * the kernel virtual mapping is activated.
  */
@@ -440,6 +443,12 @@ alternative_endif
 	.set	__pi_##x, x;		\
 	.size	__pi_##x, . - x;	\
 	ENDPROC(x)
+
+#ifdef CONFIG_KASAN
+#define EXPORT_SYMBOL_NOKASAN(name)
+#else
+#define EXPORT_SYMBOL_NOKASAN(name)	EXPORT_SYMBOL(name)
+#endif
 
 	/*
 	 * Emit a 64-bit absolute little endian symbol reference in a way that
